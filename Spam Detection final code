@@ -1,0 +1,201 @@
+import pandas as pd
+import seaborn as sns
+import numpy as np
+df = pd.read_csv('spam.csv',encoding='latin-1')
+df.head()
+df.rename(columns={'v1':'message_type', 'v2':'message'},inplace=True)
+df.sample(5)
+df[df['message_type']==1]
+df.isnull().sum()
+df.duplicated().sum()
+df= df.drop_duplicates()
+import matplotlib.pyplot as plt
+df['message_type'].value_counts()
+plt.pie(df['message_type'].value_counts(),labels=[' not spam','spam'],autopct='%0.2f')
+plt.show()
+import nltk
+nltk.download('punkt')
+df['num_characters']=df['message'].apply(len)
+df.head()
+import nltk
+nltk.download('punkt_tab')
+from nltk.tokenize import word_tokenize
+df['message'].apply(lambda x: nltk.word_tokenize(x))
+df['num_words']=df['message'].apply(lambda x:len(nltk.word_tokenize(x)))
+df.sample(5)
+df['num_sentences']=df['message'].apply(lambda x: len(nltk.sent_tokenize(x)))
+df[df['message_type']=='ham'][['num_characters','num_words','num_sentences']].describe()
+df[df['message_type']=='spam'][['num_characters','num_words','num_sentences']].describe()
+plt.figure(figsize=(12,6))
+sns.histplot(df[df['message_type']=='ham']['num_characters'],color='green')
+sns.histplot(df[df['message_type']=='spam']['num_characters'],color = 'red')
+plt.figure(figsize=(12,6))
+sns.histplot(df[df['message_type']=='ham']['num_words'],color='green')
+sns.histplot(df[df['message_type']=='spam']['num_words'],color='red')
+nltk.download('stopwords')
+from nltk.corpus import stopwords
+stopwords.words('english')
+len(stopwords.words('english'))
+def text_transform(message):
+    message=message.lower() #change to lowercase
+    message=nltk.word_tokenize(message)
+    y=[]
+    for i in message:
+        if i.isalnum():
+            y.append(i)
+
+        y.clear()
+    for i in message:
+        if i not in stopwords.words('english') and i not in string.punctuation:
+            y.append(i)
+    message=y[:]
+    y.clear()
+
+    for i in message:
+        y.append(ps.stem(i))
+
+    return " ".join(y)
+import string
+string.punctuation
+from nltk.stem.porter import PorterStemmer
+ps =PorterStemmer()
+df['transformed_msg']=df['message'].apply(text_transform)
+from wordcloud import WordCloud
+wc=WordCloud(width=500,height=500,min_font_size=10,background_color='white')
+spam_wc=wc.generate(df[df['message_type']=='spam']['transformed_msg'].str.cat(sep=""))
+plt.figure(figsize=(18,12))
+plt.imshow(spam_wc)
+ham_wc=wc.generate(df[df['message_type']=='ham']['transformed_msg'].str.cat(sep=""))
+plt.figure(figsize=(18,12))
+plt.imshow(ham_wc)
+spam_corpus=[]
+for msg in df[df['message_type']=='spam']['transformed_msg'].tolist():
+    for word in msg.split():
+        spam_corpus.append(word)
+from collections import Counter
+most_common_spam = Counter(spam_corpus).most_common(30)
+df_spam_words = pd.DataFrame(most_common_spam, columns=['word', 'count'])
+plt.figure(figsize=(18,12))
+sns.barplot(x='word',y='count',data=df_spam_words)
+plt.xticks(rotation='vertical')
+plt.show()
+import pandas as pd
+from sklearn.naive_bayes import GaussianNB
+from sklearn.naive_bayes import BernoulliNB
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.metrics import accuracy_score
+from sklearn.metrics import confusion_matrix
+from sklearn.metrics import precision_score
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import TfidfVectorizer
+import nltk
+import string
+from nltk.stem.porter import PorterStemmer
+from nltk.corpus import stopwords
+
+df = pd.read_csv('spam.csv',encoding='latin-1')
+df.rename(columns={'v1':'message_type', 'v2':'message'},inplace=True)
+df= df.drop_duplicates()
+nltk.download('punkt')
+nltk.download('punkt_tab')
+nltk.download('stopwords')
+df['num_characters']=df['message'].apply(len)
+df['num_words']=df['message'].apply(lambda x:len(nltk.word_tokenize(x)))
+df['num_sentences']=df['message'].apply(lambda x: len(nltk.sent_tokenize(x)))
+ps =PorterStemmer()
+
+def text_transform(message):
+    message=message.lower()
+    message=nltk.word_tokenize(message)
+    y=[]
+    for i in message:
+        if i.isalnum():
+            y.append(i)
+
+        y.clear()
+
+    for i in message:
+        if i not in stopwords.words('english') and i not in string.punctuation:
+            y.append(i)
+    message=y[:]
+    y.clear()
+
+    for i in message:
+        y.append(ps.stem(i))
+
+    return " ".join(y)
+
+df['transformed_msg']=df['message'].apply(text_transform)
+
+
+tfidf = TfidfVectorizer()
+X=tfidf.fit_transform(df['transformed_msg']).toarray()
+y=df['message_type'].values
+X_train,X_test,y_train,y_test = train_test_split(X,y,test_size=0.2,random_state=2)
+
+
+gnb = GaussianNB()
+bnb = BernoulliNB()
+mnb = MultinomialNB()
+
+clfs = {
+    'GaussianNB': gnb,
+    'BernoulliNB': bnb,
+    'MultinomialNB': mnb
+}
+
+accuracy_scores = []
+precision_scores = []
+
+
+gnb.fit(X_train,y_train)
+y_pred1= gnb.predict(X_test)
+accuracy_gnb = accuracy_score(y_test,y_pred1)
+precision_gnb = precision_score(y_test,y_pred1, pos_label='spam')
+
+accuracy_scores.append(accuracy_gnb)
+precision_scores.append(precision_gnb)
+
+print('Accuracy score of Gaussian NB is: ',accuracy_gnb)
+print('Confusion Matrix of Guassian NB is: ',confusion_matrix(y_test,y_pred1))
+print('Precision score of the Gaussian NB is',precision_gnb)
+
+
+mnb.fit(X_train,y_train)
+y_pred2=mnb.predict(X_test)
+accuracy_mnb = accuracy_score(y_test,y_pred2)
+precision_mnb = precision_score(y_test,y_pred2, pos_label='spam')
+
+accuracy_scores.append(accuracy_mnb)
+precision_scores.append(precision_mnb)
+
+print('Accuracy score of Multinomial NB is: ',accuracy_mnb)
+print('Confusion Matrix of Multinomial NB is: ',confusion_matrix(y_test,y_pred2))
+print('Precision score of the Multinomial NB is',precision_mnb)
+
+
+bnb.fit(X_train,y_train)
+y_pred3=bnb.predict(X_test)
+accuracy_bnb = accuracy_score(y_test,y_pred3)
+precision_bnb = precision_score(y_test,y_pred3, pos_label='spam')
+
+accuracy_scores.append(accuracy_bnb)
+precision_scores.append(precision_bnb)
+
+print('Accuracy score of Bernoulli NB is: ',accuracy_bnb)
+print('Confusion Matrix of Bernoulli NB is: ',confusion_matrix(y_test,y_pred3))
+print('Precision score of the Bernoulli NB is',precision_bnb)
+
+
+performance_df = pd.DataFrame({'Algorithm':clfs.keys(),
+                        'Accuracy_max_ft_3000':accuracy_scores,
+                        'Precision_max_ft_3000':precision_scores}).sort_values('Precision_max_ft_3000',ascending=False)
+print(performance_df)
+temp_df = pd.DataFrame({'Algorithm':clfs.keys(),'Accuracy_scaling':accuracy_scores,'Precision_scaling':precision_scores}).sort_values('Precision_scaling',ascending=False)
+new_df = performance_df.merge(temp_df,on='Algorithm')
+new_df_scaled = new_df.merge(temp_df,on='Algorithm')
+temp_df = pd.DataFrame({'Algorithm':clfs.keys(),'Accuracy_num_chars':accuracy_scores,'Precision_num_chars':precision_scores}).sort_values('Precision_num_chars',ascending=False)
+new_df_scaled.merge(temp_df,on='Algorithm')
+import pickle
+pickle.dump(tfidf,open('vectorizer.pkl','wb'))
+pickle.dump(mnb,open('model.pkl','wb'))
